@@ -1,0 +1,11 @@
+{
+  "discord_token": "",
+  "command_prefix": "!",
+  "default_volume": 0.5,
+  "max_queue_length": 50,
+  "allowed_roles": [],
+  "enable_spotify": true,
+  "spotify_client_id": "",
+  "spotify_client_secret": "",
+  "youtube_api_key": ""
+}
