@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from cogs.admin import Admin
 from cogs.music import Music
 from utils.queue_manager import QueueManager
+from utils.playlist_store import PlaylistStore
 
 
 CONFIG_PATH = Path("config.json")
@@ -45,11 +46,12 @@ class MusicBot(commands.Bot):
         super().__init__(**kwargs)
         self.config = config
         self.queue_manager = QueueManager(max_length=config.get("max_queue_length", 50))
+        self.playlist_store = PlaylistStore()
         self.logger = logging.getLogger("MusicBot")
 
     async def setup_hook(self):
-        await self.add_cog(Music(self, self.config, self.queue_manager))
-        await self.add_cog(Admin(self, self.config, self.queue_manager))
+        await self.add_cog(Music(self, self.config, self.queue_manager, self.playlist_store))
+        await self.add_cog(Admin(self, self.config, self.queue_manager, self.playlist_store))
         await self.tree.sync()
         self.logger.info("Slash commands synced.")
         print("Bot is ready.")

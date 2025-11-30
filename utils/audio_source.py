@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from typing import Optional
 
 import yt_dlp
@@ -14,12 +15,14 @@ except ImportError:
 from .queue_manager import Track
 
 
-YDL_OPTS = {
-    "format": "bestaudio/best",
+BASE_YDL_OPTS = {
+    "format": "bestaudio[ext=webm]/bestaudio/best",
     "quiet": True,
     "noplaylist": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
+    # Use alternative player clients to bypass some age/region restrictions
+    "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
 }
 
 
@@ -33,6 +36,8 @@ class AudioSource:
             os.getenv("SPOTIFY_CLIENT_SECRET") or config.get("spotify_client_secret") or ""
         )
         self.spotify_client = self._build_spotify_client()
+        self.youtube_cookies = os.getenv("YOUTUBE_COOKIES") or config.get("youtube_cookies_file") or ""
+        self.logger = logging.getLogger("AudioSource")
 
     def _build_spotify_client(self):
         if not self.spotify_enabled:
@@ -59,6 +64,15 @@ class AudioSource:
     def _is_soundcloud_url(url: str) -> bool:
         return "soundcloud.com" in url
 
+    def _yt_opts(self) -> dict:
+        opts = dict(BASE_YDL_OPTS)
+        if self.youtube_cookies:
+            if os.path.exists(self.youtube_cookies):
+                opts["cookiefile"] = self.youtube_cookies
+            else:
+                self.logger.warning("YouTube cookies file not found at %s", self.youtube_cookies)
+        return opts
+
     def resolve(self, query: str, requester: str) -> Track:
         query = query.strip()
         if self._is_url(query):
@@ -72,7 +86,7 @@ class AudioSource:
         return self._from_ytdlp(f"ytsearch1:{query}", requester, source_override="YouTube")
 
     def _from_ytdlp(self, query: str, requester: str, source_override: Optional[str] = None) -> Track:
-        with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+        with yt_dlp.YoutubeDL(self._yt_opts()) as ydl:
             info = ydl.extract_info(query, download=False)
         if info is None:
             raise ValueError("No results found.")

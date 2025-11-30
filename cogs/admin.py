@@ -8,10 +8,11 @@ import json
 
 
 class Admin(commands.Cog):
-    def __init__(self, bot: commands.Bot, config: dict, queue_manager: QueueManager):
+    def __init__(self, bot: commands.Bot, config: dict, queue_manager: QueueManager, playlist_store=None):
         self.bot = bot
         self.config = config
         self.queue_manager = queue_manager
+        self.playlist_store = playlist_store
         self.config_path = Path("config.json")
 
     def _has_permission(self, member: discord.Member) -> bool:
