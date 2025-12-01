@@ -1,34 +1,3 @@
-
-<p align="center">
-  <img src="https://dummyimage.com/960x260/1e1e2e/ffffff&text=VibeCast+Discord+Music+Bot" alt="VibeCast Banner" />
-</p>
-
-<p align="center">
-  <a href="https://www.python.org/downloads/">
-    <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+" />
-  </a>
-  <a href="https://discord.com/developers/docs/intro">
-    <img src="https://img.shields.io/badge/Discord-Bot-5865F2?logo=discord&logoColor=white" alt="Discord Bot" />
-  </a>
-  <a href="https://github.com/yt-dlp/yt-dlp">
-    <img src="https://img.shields.io/badge/yt--dlp-Supported-orange?logo=youtube&logoColor=white" alt="yt-dlp" />
-  </a>
-  <a href="#">
-    <img src="https://img.shields.io/badge/License-MIT-success?logo=open-source-initiative&logoColor=white" alt="MIT License" />
-  </a>
-  <a href="https://github.com/jishwuh/VibeCast/issues">
-    <img src="https://img.shields.io/github/issues/jishwuh/VibeCast?color=yellow" alt="Issues" />
-  </a>
-  <a href="https://github.com/jishwuh/VibeCast/stargazers">
-    <img src="https://img.shields.io/github/stars/jishwuh/VibeCast?color=gold" alt="Stars" />
-  </a>
-</p>
-
-Here’s your revamped **README** formatted with rich **Markdown styling**, **emojis**, better structure, visual hierarchy, and cleaner organization — ready to copy into GitHub 🤖🎶🔥
-(source: )
-
----
-
 # 🎧 **VibeCast Discord Music Bot**
 
 *A sleek & interactive Discord music experience — powered by yt-dlp & FFmpeg*
