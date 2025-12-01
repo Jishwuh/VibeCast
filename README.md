@@ -25,10 +25,6 @@
 
 ---
 
-# 🎧 VibeCast Discord Music Bot
-*A sleek & interactive Discord music experience — powered by yt-dlp & FFmpeg*
-
-
 # 🎧 **VibeCast Discord Music Bot**
 
 *A sleek & interactive Discord music experience — powered by yt-dlp & FFmpeg*
