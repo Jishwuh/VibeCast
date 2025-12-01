@@ -1,7 +1,7 @@
 import os
 import re
 import logging
-from typing import Optional
+from typing import Optional, List, Dict
 
 import yt_dlp
 
@@ -21,8 +21,6 @@ BASE_YDL_OPTS = {
     "noplaylist": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
-    # Use alternative player clients to bypass some age/region restrictions
-    "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
 }
 
 
@@ -37,6 +35,7 @@ class AudioSource:
         )
         self.spotify_client = self._build_spotify_client()
         self.youtube_cookies = os.getenv("YOUTUBE_COOKIES") or config.get("youtube_cookies_file") or ""
+        self.youtube_po_token = os.getenv("YOUTUBE_PO_TOKEN") or config.get("youtube_po_token") or ""
         self.logger = logging.getLogger("AudioSource")
 
     def _build_spotify_client(self):
@@ -64,29 +63,29 @@ class AudioSource:
     def _is_soundcloud_url(url: str) -> bool:
         return "soundcloud.com" in url
 
-    def _yt_opts(self) -> dict:
+    def _yt_opts(self, overrides: Optional[dict] = None) -> dict:
         opts = dict(BASE_YDL_OPTS)
         if self.youtube_cookies:
             if os.path.exists(self.youtube_cookies):
                 opts["cookiefile"] = self.youtube_cookies
             else:
                 self.logger.warning("YouTube cookies file not found at %s", self.youtube_cookies)
+        extractor_args = {"youtube": {"player_client": ["web"]}}
+        if self.youtube_po_token:
+            extractor_args["youtube"]["po_token"] = [self.youtube_po_token]
+        opts["extractor_args"] = extractor_args
+        if overrides:
+            for k, v in overrides.items():
+                if isinstance(v, dict) and isinstance(opts.get(k), dict):
+                    merged = dict(opts[k])
+                    merged.update(v)
+                    opts[k] = merged
+                else:
+                    opts[k] = v
         return opts
 
-    def resolve(self, query: str, requester: str) -> Track:
-        query = query.strip()
-        if self._is_url(query):
-            if self._is_spotify_url(query):
-                track_from_spotify = self._from_spotify(query, requester)
-                if track_from_spotify is None:
-                    raise ValueError("Unable to resolve Spotify track. Check credentials or link.")
-                return track_from_spotify
-            source = "SoundCloud" if self._is_soundcloud_url(query) else "YouTube"
-            return self._from_ytdlp(query, requester, source_override=source)
-        return self._from_ytdlp(f"ytsearch1:{query}", requester, source_override="YouTube")
-
-    def _from_ytdlp(self, query: str, requester: str, source_override: Optional[str] = None) -> Track:
-        with yt_dlp.YoutubeDL(self._yt_opts()) as ydl:
+    def _try_extract(self, query: str, opts: dict, requester: str) -> Track:
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(query, download=False)
         if info is None:
             raise ValueError("No results found.")
@@ -104,11 +103,42 @@ class AudioSource:
             url=url,
             requester=requester,
             duration=duration,
-            source=source_override or self._guess_source(url),
+            source=self._guess_source(url),
             stream_url=stream_url,
             headers=headers,
         )
         return track
+
+    def resolve(self, query: str, requester: str) -> Track:
+        query = query.strip()
+        if self._is_url(query):
+            if self._is_spotify_url(query):
+                track_from_spotify = self._from_spotify(query, requester)
+                if track_from_spotify is None:
+                    raise ValueError("Unable to resolve Spotify track. Check credentials or link.")
+                return track_from_spotify
+            source = "SoundCloud" if self._is_soundcloud_url(query) else "YouTube"
+            return self._from_ytdlp(query, requester, source_override=source)
+        return self._from_ytdlp(f"ytsearch1:{query}", requester, source_override="YouTube")
+
+    def _from_ytdlp(self, query: str, requester: str, source_override: Optional[str] = None) -> Track:
+        errors = []
+        attempts = [
+            self._yt_opts({"extractor_args": {"youtube": {"player_client": ["android"]}}}),
+            self._yt_opts({"extractor_args": {"youtube": {"player_client": ["tvembedded"]}}}),
+            self._yt_opts(),
+            self._yt_opts({"format": "bestaudio/best"}),
+        ]
+        for opts in attempts:
+            try:
+                track = self._try_extract(query, opts, requester)
+                if source_override:
+                    track.source = source_override
+                return track
+            except Exception as exc:
+                errors.append(str(exc))
+                continue
+        raise ValueError("Unable to fetch stream URL. Errors: " + " | ".join(errors))
 
     def _from_spotify(self, url: str, requester: str) -> Optional[Track]:
         if not self.spotify_client:
@@ -131,6 +161,43 @@ class AudioSource:
         track.url = url
         track.duration = duration
         return track
+
+    def fetch_playlist_entries(self, url: str, limit: int = 50) -> List[Dict[str, str]]:
+        entries: List[Dict[str, str]] = []
+        if self._is_spotify_url(url) and self.spotify_client and "/playlist/" in url:
+            try:
+                playlist_id = re.search(r"/playlist/([A-Za-z0-9]+)", url)
+                if playlist_id:
+                    resp = self.spotify_client.playlist_tracks(playlist_id.group(1), limit=limit)
+                    for item in resp.get("items", []):
+                        track = item.get("track") or {}
+                        name = track.get("name")
+                        artists = ", ".join(a["name"] for a in track.get("artists", []))
+                        if name:
+                            entries.append({"title": name, "query": f"{name} {artists}".strip(), "url": track.get("external_urls", {}).get("spotify", url)})
+            except Exception:
+                pass
+            return entries
+
+        # YouTube playlist or generic; use yt_dlp flat extraction
+        ydl_opts = {
+            "quiet": True,
+            "extract_flat": True,
+            "skip_download": True,
+            "playlistend": limit,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info and "entries" in info:
+                for item in info["entries"][:limit]:
+                    title = item.get("title") or "Unknown"
+                    link = item.get("url") or item.get("webpage_url") or url
+                    entries.append({"title": title, "query": title, "url": link})
+        except Exception:
+            # fallback: treat as single item
+            pass
+        return entries
 
     @staticmethod
     def _guess_source(url: str) -> str:

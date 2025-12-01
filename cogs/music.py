@@ -8,6 +8,7 @@ import discord
 import requests
 from discord import app_commands
 from discord.ext import commands
+import yt_dlp
 
 from utils.audio_source import AudioSource
 from utils.queue_manager import QueueManager, Track
@@ -42,6 +43,8 @@ class Music(commands.Cog):
         self.votes: dict[int, set[int]] = {}
         self.history: dict[int, List[Track]] = {}
         self.autoplay: dict[int, bool] = {}
+        self.autoplay_playlist: dict[int, Optional[str]] = {}
+        self.autoplay_playlist_pos: dict[int, int] = {}
 
     async def ensure_voice_interaction(
         self, interaction: discord.Interaction
@@ -232,6 +235,28 @@ class Music(commands.Cog):
             await interaction.response.send_message(f"Jumped to {self._format_time(target)}.", ephemeral=True)
 
     async def _try_autoplay(self, guild_id: int, channel: discord.abc.Messageable) -> Optional[Track]:
+        # Playlist-driven autoplay
+        plist_name = self.autoplay_playlist.get(guild_id)
+        if plist_name:
+            plist = self.playlist_store.get_playlist(guild_id, plist_name)
+            if plist:
+                pos = self.autoplay_playlist_pos.get(guild_id, 0) % len(plist)
+                for offset in range(len(plist)):
+                    idx = (pos + offset) % len(plist)
+                    entry = plist[idx]
+                    query = entry.get("url") or entry.get("title")
+                    try:
+                        track = self.audio_source.resolve(query, requester="Radio")
+                        self.autoplay_playlist_pos[guild_id] = idx + 1
+                        track.source = entry.get("source", track.source)
+                        return track
+                    except Exception:
+                        continue
+                await channel.send("Autoplay playlist items failed to load.")
+            else:
+                await channel.send("Autoplay playlist not found; turning off playlist autoplay.")
+                self.autoplay_playlist[guild_id] = None
+
         last = self.history.get(guild_id, [])
         if not last:
             return None
@@ -683,6 +708,9 @@ class Music(commands.Cog):
     @app_commands.command(name="playlist_save", description="Save the current queue as a playlist.")
     @app_commands.describe(name="Playlist name")
     async def playlist_save(self, interaction: discord.Interaction, name: str):
+        if not self._has_permission(interaction.user):  # type: ignore
+            await interaction.response.send_message("You don't have permission.", ephemeral=True)
+            return
         current = self.current.get(interaction.guild.id)
         queue = await self.queue_manager.list_queue(interaction.guild.id)
         tracks = []
@@ -706,6 +734,9 @@ class Music(commands.Cog):
     @app_commands.command(name="playlist_delete", description="Delete a saved playlist.")
     @app_commands.describe(name="Playlist name")
     async def playlist_delete(self, interaction: discord.Interaction, name: str):
+        if not self._has_permission(interaction.user):  # type: ignore
+            await interaction.response.send_message("You don't have permission.", ephemeral=True)
+            return
         ok = self.playlist_store.delete_playlist(interaction.guild.id, name)
         if ok:
             await interaction.response.send_message(f"Deleted playlist '{name}'.", ephemeral=True)
@@ -742,12 +773,87 @@ class Music(commands.Cog):
                 await self._start_playback(interaction.guild.id, interaction.channel, vc, next_track, replace_panel=True)  # type: ignore
         await interaction.followup.send(f"Queued {added_count} tracks from '{name}'.", ephemeral=False)
 
+    @app_commands.command(name="playlist_add", description="Add a track/query to a playlist.")
+    @app_commands.describe(name="Playlist name", query="Track URL or search text")
+    async def playlist_add(self, interaction: discord.Interaction, name: str, query: str):
+        if not self._has_permission(interaction.user):  # type: ignore
+            await interaction.response.send_message("You don't have permission.", ephemeral=True)
+            return
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        try:
+            track = self.audio_source.resolve(query, requester=str(interaction.user))
+        except Exception as exc:
+            await interaction.followup.send(f"Could not resolve track: {exc}", ephemeral=True)
+            return
+        self.playlist_store.append_track(interaction.guild.id, name, self._serialize_track(track))
+        await interaction.followup.send(f"Added **{track.title}** to playlist '{name}'.", ephemeral=True)
+
+    @app_commands.command(name="playlist_import", description="Import tracks from a Spotify or YouTube playlist into a named playlist.")
+    @app_commands.describe(name="Playlist name to save into", url="Spotify/YouTube playlist URL")
+    async def playlist_import(self, interaction: discord.Interaction, name: str, url: str):
+        if not self._has_permission(interaction.user):  # type: ignore
+            await interaction.response.send_message("You don't have permission.", ephemeral=True)
+            return
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        entries = self.audio_source.fetch_playlist_entries(url, limit=75)
+        if not entries:
+            await interaction.followup.send("Could not read that playlist.", ephemeral=True)
+            return
+        added = 0
+        for entry in entries:
+            query = entry.get("url") or entry.get("query") or entry.get("title")
+            if not query:
+                continue
+            try:
+                track = self.audio_source.resolve(query, requester=str(interaction.user))
+            except Exception:
+                continue
+            self.playlist_store.append_track(interaction.guild.id, name, self._serialize_track(track))
+            added += 1
+        if added == 0:
+            await interaction.followup.send("No tracks could be imported.", ephemeral=True)
+        else:
+            await interaction.followup.send(f"Imported {added} tracks into '{name}'.", ephemeral=True)
+
+    @app_commands.command(name="playlist_show", description="Show contents of a playlist.")
+    @app_commands.describe(name="Playlist name")
+    async def playlist_show(self, interaction: discord.Interaction, name: str):
+        data = self.playlist_store.get_playlist(interaction.guild.id, name)
+        if not data:
+            await interaction.response.send_message("Playlist not found.", ephemeral=True)
+            return
+        lines = []
+        for idx, entry in enumerate(data[:15], 1):
+            title = entry.get("title") or entry.get("url") or "Unknown"
+            lines.append(f"{idx}. {title}")
+        if len(data) > 15:
+            lines.append(f"...and {len(data) - 15} more.")
+        embed = discord.Embed(title=f"Playlist: {name}", description="\n".join(lines), color=0x5865F2)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="playlist_autoplay", description="Use a playlist for autoplay when the queue ends.")
+    @app_commands.describe(name="Playlist name or 'off'")
+    async def playlist_autoplay(self, interaction: discord.Interaction, name: str):
+        if name.lower() in ("off", "none"):
+            self.autoplay_playlist[interaction.guild.id] = None
+            self.autoplay_playlist_pos[interaction.guild.id] = 0
+            await interaction.response.send_message("Playlist autoplay disabled.", ephemeral=True)
+            return
+        data = self.playlist_store.get_playlist(interaction.guild.id, name)
+        if not data:
+            await interaction.response.send_message("Playlist not found.", ephemeral=True)
+            return
+        self.autoplay_playlist[interaction.guild.id] = name
+        self.autoplay_playlist_pos[interaction.guild.id] = 0
+        self.autoplay[interaction.guild.id] = True
+        await interaction.response.send_message(f"Autoplay will use playlist '{name}'.", ephemeral=True)
+
     @app_commands.command(name="help", description="Show bot help and onboarding.")
     async def help_cmd(self, interaction: discord.Interaction):
         desc = (
             "Use `/play <url|search>` or `/search` to add music.\n"
             "Controls: `/pause`, `/resume`, `/skip`, `/stop`, `/queue`, `/nowplaying`, `/volume`, `/clear`.\n"
-            "Extras: `/panel` for buttons, `/history`, `/autoplay on|off`, `/playlist_save` and `/playlist_load`, `/vskip` for vote skip."
+            "Extras: `/panel`, `/history`, `/autoplay on|off`, `/playlist_save/load/add/show/delete`, `/playlist_autoplay`, `/vskip`, `/djadd`."
         )
         embed = discord.Embed(title="Music Bot Help", description=desc, color=0x5865F2)
         embed.add_field(name="DJ/Admin", value="Manage roles with `/setroles` (admin), add temps with `/djadd`.", inline=False)

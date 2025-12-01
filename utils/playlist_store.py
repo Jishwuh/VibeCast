@@ -33,6 +33,12 @@ class PlaylistStore:
         self._data.setdefault(guild_key, {})[name] = tracks
         self._save()
 
+    def append_track(self, guild_id: int, name: str, track: dict):
+        guild_key = str(guild_id)
+        playlist = self._data.setdefault(guild_key, {}).setdefault(name, [])
+        playlist.append(track)
+        self._save()
+
     def delete_playlist(self, guild_id: int, name: str) -> bool:
         guild_key = str(guild_id)
         if guild_key in self._data and name in self._data[guild_key]:

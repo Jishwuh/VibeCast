@@ -1,5 +1,7 @@
 config.json
 youtube_cookies.txt
+cookies.txt
+playlists.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
