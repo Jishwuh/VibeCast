@@ -1,47 +1,160 @@
-VibeCast
-=================
 
-Features
-- Slash command search with YouTube autocomplete (YouTube Data API v3).
-- Plays audio from YouTube, Spotify (tracks resolved via YouTube), and SoundCloud using yt-dlp + FFmpeg.
-- Per-guild queue, basic playback controls, and role-gated admin actions.
+<p align="center">
+  <img src="https://dummyimage.com/960x260/1e1e2e/ffffff&text=VibeCast+Discord+Music+Bot" alt="VibeCast Banner" />
+</p>
 
-Prerequisites
-- Python 3.10+
-- FFmpeg installed and on PATH.
-- Discord bot token.
-- YouTube Data API key (for autocomplete).
-- Optional: Spotify Client ID/Secret for better Spotify track metadata.
+<p align="center">
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+" />
+  </a>
+  <a href="https://discord.com/developers/docs/intro">
+    <img src="https://img.shields.io/badge/Discord-Bot-5865F2?logo=discord&logoColor=white" alt="Discord Bot" />
+  </a>
+  <a href="https://github.com/yt-dlp/yt-dlp">
+    <img src="https://img.shields.io/badge/yt--dlp-Supported-orange?logo=youtube&logoColor=white" alt="yt-dlp" />
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/License-MIT-success?logo=open-source-initiative&logoColor=white" alt="MIT License" />
+  </a>
+  <a href="https://github.com/jishwuh/VibeCast/issues">
+    <img src="https://img.shields.io/github/issues/jishwuh/VibeCast?color=yellow" alt="Issues" />
+  </a>
+  <a href="https://github.com/jishwuh/VibeCast/stargazers">
+    <img src="https://img.shields.io/github/stars/jishwuh/VibeCast?color=gold" alt="Stars" />
+  </a>
+</p>
 
-Setup
-1) Create and activate a virtual environment:
-   python -m venv .venv
-   .\.venv\Scripts\activate
-2) Install dependencies:
-   pip install -r requirements.txt
-3) Fill config.json with your tokens/keys. You can also store secrets in a .env file (DISCORD_TOKEN, YOUTUBE_API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET) and leave config values blank to prefer env.
-4) Run the bot:
-   python bot.py
+---
 
-Getting a YouTube API key
-1) Go to Google Cloud Console: https://console.cloud.google.com/
-2) Create/select a project.
-3) Enable the YouTube Data API v3 (APIs & Services -> Library -> search “YouTube Data API v3” -> Enable).
-4) Create credentials (APIs & Services -> Credentials -> Create Credentials -> API key).
-5) Copy the API key and place it in config.json (youtube_api_key) or .env (YOUTUBE_API_KEY).
+# 🎧 VibeCast Discord Music Bot
+*A sleek & interactive Discord music experience — powered by yt-dlp & FFmpeg*
 
-Getting Spotify API credentials
-1) Go to https://developer.spotify.com/dashboard/ and log in.
-2) Create an app; give it a name and description.
-3) Open the app and copy the Client ID and Client Secret.
-4) Put them in config.json (spotify_client_id/spotify_client_secret) or .env (SPOTIFY_CLIENT_ID/SPOTIFY_CLIENT_SECRET).
-5) Ensure enable_spotify is true in config.json if you want Spotify queries resolved.
 
-Commands (slash only)
-- /join, /leave, /play <query|url>, /pause, /resume, /skip, /stop, /queue, /nowplaying, /volume <0-100>, /clear
-- /search: Slash command with autocomplete suggestions from YouTube; selecting a result will play it.
+# 🎧 **VibeCast Discord Music Bot**
 
-Notes
-- Queues are in-memory per guild. Bot disconnects after idle periods.
-- Admin-only commands are restricted to roles in allowed_roles from config.json. If none are set, the caller is allowed.
-- Lavalink is not used; audio streams directly via yt-dlp + FFmpeg.
+*A sleek & interactive Discord music experience — powered by yt-dlp & FFmpeg*
+
+---
+
+## 🚀 What It Does
+
+* 🔹 Fully **slash-command based** (no prefixes)
+* 🎛️ **Interactive control panel** with buttons + progress bar
+* 🎙️ **Streams audio directly** using `yt-dlp` + `FFmpeg`
+* 📦 Supports **YouTube**, **Spotify (resolved via YouTube)**, & **SoundCloud**
+* 🎶 Per-guild **queue**, **history**, **autoplay**, and **vote-skip**
+* 📂 Persistent **playlist system** (`data/playlists.json`)
+* 🔍 Smart **YouTube autocomplete** (`/search`)
+* 📎 Idle **auto-disconnect** and **role-based permissions**
+
+---
+
+## 🧠 Core Slash Commands
+
+| Category              | Commands                                                                                                                        |                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 🎵 Playback           | `/play`, `/pause`, `/resume`, `/skip`, `/stop`, `/volume`, `/clear`, `/queue`, `/nowplaying`                                    |                            |
+| 🔍 Search & Control   | `/search` (autocomplete), `/panel` (interactive)                                                                                |                            |
+| 🧑‍💻 Admin/DJ        | `/setroles`, `/djadd`, `/djremove`, `/djlist`, `/shutdown`, `/clearqueue`                                                       |                            |
+| 🙋 Vote Skip          | `/vskip`                                                                                                                        |                            |
+| 🕓 History & Autoplay | `/history`, `/autoplay on                                                                                                       | off`, `/playlist_autoplay` |
+| 📻 Playlists          | `/playlist_save`, `/playlist_load`, `/playlist_list`, `/playlist_show`, `/playlist_delete`, `/playlist_add`, `/playlist_import` |                            |
+| ❓ Help                | `/help`                                                                                                                         |                            |
+
+---
+
+## ⚡ Quick Start
+
+```bash
+1️⃣ Python 3.10+ and FFmpeg installed & on PATH.
+2️⃣ python -m venv .venv && .\.venv\Scripts\activate
+3️⃣ pip install -r requirements.txt
+4️⃣ Fill config.json or export environment variables:
+    • DISCORD_TOKEN (required)
+    • YOUTUBE_API_KEY (for autocomplete)
+    • SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET (optional)
+    • YOUTUBE_COOKIES (optional – path to cookies)
+    • YOUTUBE_PO_TOKEN (optional)
+5️⃣ python bot.py
+```
+
+---
+
+## 🔧 Config Tips
+
+* 🛂 `allowed_roles` → role IDs or names (admins bypass restrictions)
+* 🎚️ `max_queue_length` → maximum queue size
+* 🔊 `default_volume` → float 0–1 (e.g., `0.5`)
+
+---
+
+## 📓 Playlists
+
+| Action                        | Command                                  |
+| ----------------------------- | ---------------------------------------- |
+| 💾 Save current track + queue | `/playlist_save mylist`                  |
+| ➕ Add track/search            | `/playlist_add mylist <url or query>`    |
+| 📥 Load into queue            | `/playlist_load mylist`                  |
+| 📃 List playlists             | `/playlist_list`                         |
+| 🔍 View contents              | `/playlist_show mylist`                  |
+| ❌ Delete playlist             | `/playlist_delete mylist`                |
+| 📥 Import (Spotify/YouTube)   | `/playlist_import mylist <playlist-url>` |
+| 🔁 Autoplay this playlist     | `/playlist_autoplay mylist`              |
+
+---
+
+## 📻 Autoplay / Radio Mode
+
+* 🔁 If playlist set with `/playlist_autoplay` → loop it
+* 🧠 If not set → auto-search based on last played track
+
+---
+
+## 🔐 Permissions
+
+| Role                          | Capabilities                         |
+| ----------------------------- | ------------------------------------ |
+| 👑 Admins                     | Full access                          |
+| 🎧 DJ roles (`allowed_roles`) | Manage playlists, queue, stop, clear |
+| 🕹️ Temporary DJs             | Added via `/djadd`                   |
+
+---
+
+## 🆘 Troubleshooting
+
+| Issue                         | Fix                                                          |
+| ----------------------------- | ------------------------------------------------------------ |
+| ❌ No sound / FFmpeg error     | Ensure `ffmpeg` installed & on PATH                          |
+| 🚫 SABR / mature video blocks | Update `yt-dlp`; export cookies; configure `YOUTUBE_COOKIES` |
+| ⚙️ Autocomplete broken        | Check `YOUTUBE_API_KEY`                                      |
+| 💬 Slash commands missing     | Restart bot → wait for “Slash commands synced”               |
+| 🎧 Spotify failure            | Set `SPOTIFY_CLIENT_*` and enable in config                  |
+| ⛔ yt-dlp signature errors     | Ensure Node.js on PATH                                       |
+
+---
+
+## 🏗 Project Layout
+
+```
+bot.py               → Main entrypoint
+cogs/music.py        → Playback, queue logic, UI panel
+cogs/admin.py        → Admin & DJ commands
+utils/               → Source resolver, queue manager, playlist store
+data/playlists.json  → Persistent playlists
+logs/                → Runtime logs
+```
+
+---
+
+## 📌 Notes
+
+* 🎼 Direct streaming (no Lavalink required)
+* 🧠 Queue/history stored per guild (in-memory)
+* 💿 Playlists persist on disk
+* ⏱ Idle disconnect after inactivity
+
+---
+
+## ❤️ Final Thoughts
+
+> VibeCast is a modern, optimized, fully interactive music bot designed for a smooth, DJ-like Discord experience. Ideal for stream parties, gaming nights, or chill servers.
